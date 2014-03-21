@@ -14,12 +14,15 @@
         function addFields(){
             // Number of inputs to create
             var number = document.getElementById("clues").value;
+            
+            document.getElementById("numClues").value = number;
+            /*
             var labels = document.getElementsByTagName("input");
             for( var i = 0; i < labels.length; i++ ){
                 if( labels[i].outerHTML.indexOf('name="numClues"') > -1){
                     labels[i].innerHTML = number;
                 }
-            }
+            }*/
             // Container <div> where dynamic content will be placed
             var container = document.getElementById("container");
             // Clear previous contents of the container
@@ -48,7 +51,7 @@
     <body>
         <h1>This is the main page for Huntsperson</h1>
             <form name="item" method="POST" action="QRGen">
-                <input type="hidden" name="numClues" value="">
+                <input type="hidden" id="numClues" name="numClues" value="">
                 <input type="text" id="clues" name="clues" value="">Number of Clues<br />
                 <div id="container"/>
             </form>
