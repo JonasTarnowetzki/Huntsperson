@@ -8,14 +8,21 @@ package servlets;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import net.glxn.qrgen.QRCode;
-import net.glxn.qrgen.image.ImageType;
+import javax.sql.DataSource;
 
 /**
  *
@@ -86,6 +93,7 @@ public class QRGen extends HttpServlet {
         {
             processRequest(request, response);
             this.processClues(request, response);
+            this.setUpFBGroup();
         }
         else
         {
@@ -96,13 +104,64 @@ public class QRGen extends HttpServlet {
 
     /**
      * Processes the set of clues passed to the servlet by the webpage, and 
-     * generates a QR code for each clue.
+     * generates a QR code for each clue.  Stores the clues in a database.
+     * 
+     * Database has columns NUMERIC CLUEID, VARCHAR FBGROUPID, and VARCHAR CLUE
+     * 
      * @param request The Http Request object originating the request
      * @param response The Http Response object directed to the requesting object
      */
     protected void processClues(HttpServletRequest request, HttpServletResponse response) 
-            throws IOException
     {
+        Connection con = null;
+        Statement st = null;
+        ResultSet rs = null;
+        
+        try {
+            Context ctx = new InitialContext();
+            DataSource ds = (DataSource) ctx.lookup("java:comp/env/jdbc/Huntsperson");
+            
+            con = ds.getConnection();
+            st = con.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            
+            //Grabs values
+            rs = st.executeQuery("SELECT MAX(CLUEID) FROM CLUETABLE");
+            
+            Logger lgr = Logger.getLogger("processClues");
+            if (rs.isBeforeFirst())
+            {
+                lgr.log(Level.INFO, "SQL query SELECT MAX(CLUEID) FROM CLUETABLE returned null pointer.");
+                
+            }
+        }
+        catch (SQLException e)
+        {
+            Logger lgr = Logger.getLogger("processClues");
+            lgr.log(Level.SEVERE, e.getMessage(), e);
+        }
+        catch (NamingException e)
+        {
+            Logger lgr = Logger.getLogger("processClues");
+            lgr.log(Level.SEVERE, e.getMessage(), e);
+        }
+        finally
+        {
+            //I have no idea what should go here, if anything.
+        }
+        
+        String strNum = request.getParameter("numClues");
+        int intNum = Integer.parseInt(strNum);
+        
+        for (int i = 0; i < intNum; i++)
+        {
+            //Code for generating QR codes for each clue goes here.
+        }
+    }
+    
+    /**
+     * Creates the Facebook group for a given Huntsperson 
+     */
+    protected void setUpFBGroup() {
         
     }
     
