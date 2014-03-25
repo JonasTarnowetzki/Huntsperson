@@ -38,7 +38,7 @@ import net.glxn.qrgen.image.ImageType;
 @WebServlet(name = "QRGen", urlPatterns = {"/QRGen"})
 public class QRGen extends HttpServlet {
     
-    private final String QR_PATH = System.getProperty("user.dir").concat("/Huntsperson/QRCodes");
+    private final String QR_PATH = System.getProperty("user.dir").concat("/Huntsperson/QRCodes/");
 
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
@@ -135,7 +135,13 @@ public class QRGen extends HttpServlet {
         String strNum = request.getParameter("numClues");
         int intNum = Integer.parseInt(strNum);
         
-        this.genQRCode(groupNum, intNum);
+        try {
+            this.genQRCode(groupNum, intNum);
+        }
+        catch (IOException e)
+        {
+            this.logError(e, "processClues");
+        }
     }
     
     /**
@@ -176,19 +182,11 @@ public class QRGen extends HttpServlet {
             
             num = num + incrementor;
             // </editor-fold>
-        }
-        catch (SQLException e)
-        {
-            Logger lgr = Logger.getLogger("getCurClueID");
-            lgr.log(Level.SEVERE, e.getMessage(), e);
-        }
-        catch (NamingException e)
-        {
-            Logger lgr = Logger.getLogger("getCurClueID");
-            lgr.log(Level.SEVERE, e.getMessage(), e);
-        }
-        finally
-        {
+        } catch (SQLException e){
+            this.logError(e, "getCurClueID");
+        } catch (NamingException e){
+            this.logError(e, "getCurClueID");
+        } finally {
             //I have no idea what should go here, if anything.
         }
         // </editor-fold>
@@ -197,23 +195,29 @@ public class QRGen extends HttpServlet {
     }
     
     
-    protected void genQRCode(int groupNum, int intNum) {
+    protected void genQRCode(int groupNum, int intNum) throws IOException {
         
         groupNum = this.parseClueID(groupNum);
         
         //TODO: devise weblink to encode in QR.
         //webLink must equal a get/post that will call the web server and check
-        //whether
-        String webLink = null; 
+        //whether the QRcode is valid or not.
+        String webLink = "tempdata"; 
+        
+        //First time run logic, checks whether the QR directory exists.
+        if (!new File(QR_PATH).mkdirs()) { throw new IOException(); }
         
         for (int i = 0; i < intNum; i++)
         {
             //Code for generating QR codes for each clue goes here.
             ByteArrayOutputStream out = QRCode.from(webLink)
                                         .to(ImageType.PNG).stream();
+            groupNum++;
+            //TODO: Refactor this try/catch for readability.
             try {
                 
-                FileOutputStream fout = new FileOutputStream(new File(QR_PATH));
+                FileOutputStream fout = new FileOutputStream(
+                        new File(QR_PATH.concat(String.valueOf(groupNum).concat(".png"))));
  
                 fout.write(out.toByteArray());
  
@@ -221,11 +225,11 @@ public class QRGen extends HttpServlet {
                 fout.close();
  
             } catch (FileNotFoundException e) {
-                Logger lgr = Logger.getLogger("genQRCode");
-                lgr.log(Level.SEVERE, e.getMessage(), e);
+                this.logError(e, "genQRCode");
             } catch (IOException e) {
-                Logger lgr = Logger.getLogger("genQRCode");
-                lgr.log(Level.SEVERE, e.getMessage(), e);
+                this.logError(e, "genQRCode");
+            } finally {
+                
             }
                 //Also include code to assign data to database.
         }
@@ -252,6 +256,17 @@ public class QRGen extends HttpServlet {
         lgr.log(Level.INFO, "parseClueID returned value of {0} from {1}", new Object[]{catInt, groupNum});
         
         return catInt;
+    }
+    
+    /**
+     * Logs a generic exception
+     * @param e The exception thrown by the program
+     * @param str The method the exception was thrown in.
+     */
+    protected void logError(Exception e, String str)
+    {
+        Logger lgr = Logger.getLogger(str);
+        lgr.log(Level.SEVERE, e.getMessage(), e);
     }
     
     /**
