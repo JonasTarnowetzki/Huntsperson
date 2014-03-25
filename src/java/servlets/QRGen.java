@@ -6,6 +6,10 @@
 
 package servlets;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
@@ -23,6 +27,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
+
+import net.glxn.qrgen.QRCode;
+import net.glxn.qrgen.image.ImageType;
 
 /**
  *
@@ -108,16 +115,50 @@ public class QRGen extends HttpServlet {
      * 
      * Database has columns NUMERIC CLUEID, VARCHAR FBGROUPID, and VARCHAR CLUE
      * 
+     * CLUEID is an eight digit number used to index the clue.  The first six digits 
+     * represent the group the clue responds to.  The last two digits represent the clue 
+     * number.
+     * 
      * @param request The Http Request object originating the request
      * @param response The Http Response object directed to the requesting object
      */
     protected void processClues(HttpServletRequest request, HttpServletResponse response) 
     {
+        
+        int groupNum = 0; 
+        int groupIncrementor = 100; //increments the group number of CLUEID by one
+        
+        groupNum = this.getCurClueID(groupIncrementor);
+        
+        String strNum = request.getParameter("numClues");
+        int intNum = Integer.parseInt(strNum);
+        
+        this.genQRCode(groupNum, intNum);
+    }
+    
+    /**
+     * Creates the Facebook group for a given Huntsperson 
+     */
+    protected void setUpFBGroup() {
+        
+    }
+    
+    /**
+     * Performs an SQL call to check which CLUEID to begin generating the new 
+     * clue set with.
+     * @param incrementor The value to increase the multi part ClueID by per clue.
+     * @return An integer corresponding to the current ClueID
+     */
+    protected int getCurClueID(int incrementor) {
+        
         Connection con = null;
         Statement st = null;
         ResultSet rs = null;
         
+        int num = 0;
+        
         try {
+            // <editor-fold defaultstate="collapsed" desc="Core logic for SQL call.">
             Context ctx = new InitialContext();
             DataSource ds = (DataSource) ctx.lookup("java:comp/env/jdbc/Huntsperson");
             
@@ -128,11 +169,18 @@ public class QRGen extends HttpServlet {
             rs = st.executeQuery("SELECT MAX(CLUEID) FROM CLUETABLE");
             
             Logger lgr = Logger.getLogger("processClues");
-            if (rs.isBeforeFirst())
+            if (!rs.first()) //Database empty
             {
                 lgr.log(Level.INFO, "SQL query SELECT MAX(CLUEID) FROM CLUETABLE returned null pointer.");
-                
             }
+            else
+            {
+                num = rs.getInt(1);
+                lgr.log(Level.INFO, "SQL query SELECT MAX(CLUEID) FROM CLUETABLE returned {0}", num);
+            }
+            
+            num = num + incrementor;
+            // </editor-fold>
         }
         catch (SQLException e)
         {
@@ -148,21 +196,46 @@ public class QRGen extends HttpServlet {
         {
             //I have no idea what should go here, if anything.
         }
+        // </editor-fold>
         
-        String strNum = request.getParameter("numClues");
-        int intNum = Integer.parseInt(strNum);
+        return num;
+    }
+    
+    
+    protected void genQRCode(int groupNum, int intNum) {
+        
+        String groupStr = String.valueOf(intNum);
+        int strlen = groupStr.length();
+        String catStr = groupStr.substring(0, strlen - 2);
+        groupStr = catStr.concat("00");
+        groupNum = Integer.valueOf(groupStr);
         
         for (int i = 0; i < intNum; i++)
         {
             //Code for generating QR codes for each clue goes here.
+            String pwd = System.getProperty("user.dir");
+            ByteArrayOutputStream out = QRCode.from("Hello World")
+                                        .to(ImageType.PNG).stream();
+            try {
+                
+                String path = pwd.concat(pwd);
+                FileOutputStream fout = new FileOutputStream(new File(
+                    "C:\\QR_Code.JPG"));
+ 
+                fout.write(out.toByteArray());
+ 
+                fout.flush();
+                fout.close();
+ 
+            } catch (FileNotFoundException e) {
+                Logger lgr = Logger.getLogger("genQRCode");
+                lgr.log(Level.SEVERE, e.getMessage(), e);
+            } catch (IOException e) {
+                Logger lgr = Logger.getLogger("genQRCode");
+                lgr.log(Level.SEVERE, e.getMessage(), e);
+            }
+                //Also include code to assign data to database.
         }
-    }
-    
-    /**
-     * Creates the Facebook group for a given Huntsperson 
-     */
-    protected void setUpFBGroup() {
-        
     }
     
     /**
@@ -173,6 +246,6 @@ public class QRGen extends HttpServlet {
     @Override
     public String getServletInfo() {
         return "Short description";
-    }// </editor-fold>
-
+    }
+// </editor-fold>
 }
