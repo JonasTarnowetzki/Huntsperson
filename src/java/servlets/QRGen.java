@@ -179,12 +179,12 @@ public class QRGen extends HttpServlet {
         }
         catch (SQLException e)
         {
-            Logger lgr = Logger.getLogger("processClues");
+            Logger lgr = Logger.getLogger("getCurClueID");
             lgr.log(Level.SEVERE, e.getMessage(), e);
         }
         catch (NamingException e)
         {
-            Logger lgr = Logger.getLogger("processClues");
+            Logger lgr = Logger.getLogger("getCurClueID");
             lgr.log(Level.SEVERE, e.getMessage(), e);
         }
         finally
@@ -248,7 +248,7 @@ public class QRGen extends HttpServlet {
         groupStr = catStr.concat("00");
         catInt = Integer.valueOf(groupStr);
         
-        Logger lgr = Logger.getLogger("genQRCode");
+        Logger lgr = Logger.getLogger("parseClueID");
         lgr.log(Level.INFO, "parseClueID returned value of {0} from {1}", new Object[]{catInt, groupNum});
         
         return catInt;
