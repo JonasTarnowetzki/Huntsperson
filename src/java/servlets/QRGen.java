@@ -217,22 +217,28 @@ public class QRGen extends HttpServlet {
                                         .to(ImageType.PNG).stream();
             groupNum++;
             //TODO: Refactor this try/catch for readability.
+            
+            FileOutputStream fout = null;
             try {
-                
-                FileOutputStream fout = new FileOutputStream(
-                        new File(QR_PATH.concat(String.valueOf(groupNum).concat(".png"))));
+                String filepath = QR_PATH.concat(String.valueOf(groupNum).concat(".png"));
+                fout = new FileOutputStream(
+                        new File(filepath));
  
                 fout.write(out.toByteArray());
  
                 fout.flush();
-                fout.close();
- 
+                
+                Logger lgr = Logger.getLogger("genQRCode");
+                lgr.log(Level.INFO, "Created QRCode at {0}.", filepath);
             } catch (FileNotFoundException e) {
                 this.logError(e, "genQRCode");
             } catch (IOException e) {
                 this.logError(e, "genQRCode");
             } finally {
-                
+                if (fout != null)
+                {
+                    fout.close();
+                }
             }
             
             
