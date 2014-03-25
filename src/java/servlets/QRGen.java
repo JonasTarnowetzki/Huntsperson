@@ -37,6 +37,8 @@ import net.glxn.qrgen.image.ImageType;
  */
 @WebServlet(name = "QRGen", urlPatterns = {"/QRGen"})
 public class QRGen extends HttpServlet {
+    
+    private final String QR_PATH = System.getProperty("user.dir").concat("/Huntsperson/QRCodes");
 
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
@@ -100,7 +102,6 @@ public class QRGen extends HttpServlet {
         {
             processRequest(request, response);
             this.processClues(request, response);
-            this.setUpFBGroup();
         }
         else
         {
@@ -125,22 +126,16 @@ public class QRGen extends HttpServlet {
     protected void processClues(HttpServletRequest request, HttpServletResponse response) 
     {
         
-        int groupNum = 0; 
+        int groupNum; 
         int groupIncrementor = 100; //increments the group number of CLUEID by one
         
         groupNum = this.getCurClueID(groupIncrementor);
         
+        //Grabs form data for loops made later.
         String strNum = request.getParameter("numClues");
         int intNum = Integer.parseInt(strNum);
         
         this.genQRCode(groupNum, intNum);
-    }
-    
-    /**
-     * Creates the Facebook group for a given Huntsperson 
-     */
-    protected void setUpFBGroup() {
-        
     }
     
     /**
@@ -204,23 +199,21 @@ public class QRGen extends HttpServlet {
     
     protected void genQRCode(int groupNum, int intNum) {
         
-        String groupStr = String.valueOf(intNum);
-        int strlen = groupStr.length();
-        String catStr = groupStr.substring(0, strlen - 2);
-        groupStr = catStr.concat("00");
-        groupNum = Integer.valueOf(groupStr);
+        groupNum = this.parseClueID(groupNum);
+        
+        //TODO: devise weblink to encode in QR.
+        //webLink must equal a get/post that will call the web server and check
+        //whether
+        String webLink = null; 
         
         for (int i = 0; i < intNum; i++)
         {
             //Code for generating QR codes for each clue goes here.
-            String pwd = System.getProperty("user.dir");
-            ByteArrayOutputStream out = QRCode.from("Hello World")
+            ByteArrayOutputStream out = QRCode.from(webLink)
                                         .to(ImageType.PNG).stream();
             try {
                 
-                String path = pwd.concat(pwd);
-                FileOutputStream fout = new FileOutputStream(new File(
-                    "C:\\QR_Code.JPG"));
+                FileOutputStream fout = new FileOutputStream(new File(QR_PATH));
  
                 fout.write(out.toByteArray());
  
@@ -236,6 +229,29 @@ public class QRGen extends HttpServlet {
             }
                 //Also include code to assign data to database.
         }
+    }
+    
+    /**
+     * Cleans up the integer returned by getCurClueID so it can be used by the
+     * QRGen logic.  Cleaning up means reverting the last two digits of groupNum to
+     * zeroes.
+     * 
+     * @param intNum The integer to parse.
+     * @return A cleaned integer used to begin the cluemaking logic.
+     */
+    int parseClueID(int groupNum)
+    {
+        int catInt;
+        String groupStr = String.valueOf(groupNum);
+        int strlen = groupStr.length();
+        String catStr = groupStr.substring(0, strlen - 2);
+        groupStr = catStr.concat("00");
+        catInt = Integer.valueOf(groupStr);
+        
+        Logger lgr = Logger.getLogger("genQRCode");
+        lgr.log(Level.INFO, "parseClueID returned value of {0} from {1}", new Object[]{catInt, groupNum});
+        
+        return catInt;
     }
     
     /**
