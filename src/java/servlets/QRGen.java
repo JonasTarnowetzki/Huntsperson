@@ -140,7 +140,8 @@ public class QRGen extends HttpServlet {
         }
         catch (IOException e)
         {
-            this.logError(e, "processClues");
+            Logger lgr = Logger.getLogger("genQRCode");
+            lgr.log(Level.SEVERE, "Creation of QRCode directory failed.", e);
         }
     }
     
@@ -205,7 +206,9 @@ public class QRGen extends HttpServlet {
         String webLink = "tempdata"; 
         
         //First time run logic, checks whether the QR directory exists.
-        if (!new File(QR_PATH).mkdirs()) { throw new IOException(); }
+        if (!new File(QR_PATH).exists()) { 
+            new File(QR_PATH).mkdirs();
+        }
         
         for (int i = 0; i < intNum; i++)
         {
@@ -231,6 +234,8 @@ public class QRGen extends HttpServlet {
             } finally {
                 
             }
+            
+            
                 //Also include code to assign data to database.
         }
     }
