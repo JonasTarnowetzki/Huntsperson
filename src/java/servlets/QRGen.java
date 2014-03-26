@@ -100,7 +100,6 @@ public class QRGen extends HttpServlet {
         
         if (strAction.equalsIgnoreCase("submit"))
         {
-            processRequest(request, response);
             this.processClues(request, response);
         }
         else
@@ -135,14 +134,7 @@ public class QRGen extends HttpServlet {
         String strNum = request.getParameter("numClues");
         int intNum = Integer.parseInt(strNum);
         
-        try {
-            this.genQRCode(groupNum, intNum);
-        }
-        catch (IOException e)
-        {
-            Logger lgr = Logger.getLogger("genQRCode");
-            lgr.log(Level.SEVERE, "Creation of QRCode directory failed.", e);
-        }
+        this.genQRCode(groupNum, intNum, request);
     }
     
     /**
@@ -171,16 +163,14 @@ public class QRGen extends HttpServlet {
             rs = st.executeQuery("SELECT MAX(CLUEID) FROM CLUETABLE");
             
             Logger lgr = Logger.getLogger("processClues");
-            if (!rs.first()) //Database empty
-            {
-                lgr.log(Level.INFO, "SQL query SELECT MAX(CLUEID) FROM CLUETABLE returned null pointer.");
+            if (!rs.first()) { lgr.log(Level.INFO, 
+                    "SQL query SELECT MAX(CLUEID) FROM CLUETABLE returned null pointer.");
             }
-            else
-            {
+            else {
                 num = rs.getInt(1);
-                lgr.log(Level.INFO, "SQL query SELECT MAX(CLUEID) FROM CLUETABLE returned {0}", num);
+                lgr.log(Level.INFO, 
+                    "SQL query SELECT MAX(CLUEID) FROM CLUETABLE returned {0}", num);
             }
-            
             num = num + incrementor;
             // </editor-fold>
         } catch (SQLException e){
@@ -196,7 +186,7 @@ public class QRGen extends HttpServlet {
     }
     
     
-    protected void genQRCode(int groupNum, int intNum) throws IOException {
+    protected void genQRCode(int groupNum, int intNum, HttpServletRequest request) {
         
         groupNum = this.parseClueID(groupNum);
         
@@ -204,6 +194,7 @@ public class QRGen extends HttpServlet {
         //webLink must equal a get/post that will call the web server and check
         //whether the QRcode is valid or not.
         String webLink = "tempdata"; 
+        String fbid = "";
         
         //First time run logic, checks whether the QR directory exists.
         if (!new File(QR_PATH).exists()) { 
@@ -213,36 +204,78 @@ public class QRGen extends HttpServlet {
         for (int i = 0; i < intNum; i++)
         {
             //Code for generating QR codes for each clue goes here.
-            ByteArrayOutputStream out = QRCode.from(webLink)
-                                        .to(ImageType.PNG).stream();
             groupNum++;
             //TODO: Refactor this try/catch for readability.
             
-            FileOutputStream fout = null;
-            try {
-                String filepath = QR_PATH.concat(String.valueOf(groupNum).concat(".png"));
-                fout = new FileOutputStream(
-                        new File(filepath));
- 
-                fout.write(out.toByteArray());
- 
-                fout.flush();
-                
-                Logger lgr = Logger.getLogger("genQRCode");
-                lgr.log(Level.INFO, "Created QRCode at {0}.", filepath);
-            } catch (FileNotFoundException e) {
-                this.logError(e, "genQRCode");
+            try { this.makeQR(webLink, fbid, groupNum);
             } catch (IOException e) {
                 this.logError(e, "genQRCode");
-            } finally {
-                if (fout != null)
-                {
-                    fout.close();
-                }
             }
             
+            this.insertClueIntoTable(request, fbid, groupNum, i);
+        }
+    }
+    
+    protected void makeQR(String webLink, String fbid, int groupNum) throws IOException {
+        FileOutputStream fout = null;
+        try {
+            ByteArrayOutputStream out = QRCode.from(webLink).to(ImageType.PNG).stream();
             
-                //Also include code to assign data to database.
+            String filepath = QR_PATH.concat(String.valueOf(groupNum).concat(".png"));
+            fout = new FileOutputStream(new File(filepath));
+            fout.write(out.toByteArray());
+            fout.flush();
+                
+            Logger lgr = Logger.getLogger("makeQR");
+            lgr.log(Level.INFO, "Created QRCode at {0}.", filepath);
+            } catch (FileNotFoundException e) {
+                this.logError(e, "makeQR");
+                
+            } catch (IOException e) {
+                this.logError(e, "makeQR");
+                
+            } finally {
+                if (fout != null) { fout.close(); }
+            }
+    }
+    
+    /**
+     * Inserts a clue passed in via HttpRequest into the database, associated with
+     * a clue and a facebook group id.
+     * 
+     * @param request The HttpServletRequest object that originated this call.  
+     * Contains the CLUE string in form data in "clue" + i format.
+     * @param fbid The facebook group id that this clue is associated with.
+     * @param groupNum The CLUEID of the given clue.
+     * @param i The incrementor used to get clues from the request object.
+     */
+    protected void insertClueIntoTable(HttpServletRequest request, String fbid, int groupNum, int i) {
+        try {
+            Connection con = null;
+            Statement st = null;
+            ResultSet rs = null;
+                
+            Context ctx = new InitialContext();
+            DataSource ds = (DataSource) ctx.lookup("java:comp/env/jdbc/Huntsperson");
+                
+            con = ds.getConnection();
+            st = con.createStatement();
+                
+            String str = request.getParameter(("clue").concat(String.valueOf(i)));
+            String insert = "INSERT INTO CLUETABLE (CLUEID,FBGROUPID, CLUE) ";
+            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + str + "')";
+               
+            int rows = st.executeUpdate(insert + values);
+            
+            Logger lgr = Logger.getLogger("insertClueIntoTable");
+            lgr.log(Level.INFO, "Executed SQL statement {0}{1}", new Object[]{insert, values});
+            
+        } catch (SQLException e){
+            this.logError(e, "insertClueIntoTable");
+        } catch (NamingException e){
+            this.logError(e, "insertClueIntoTable");
+        } finally {
+        //I have no idea what should go here, if anything.
         }
     }
     
