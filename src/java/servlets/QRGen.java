@@ -205,7 +205,6 @@ public class QRGen extends HttpServlet {
         {
             //Code for generating QR codes for each clue goes here.
             groupNum++;
-            //TODO: Refactor this try/catch for readability.
             
             try { this.makeQR(webLink, fbid, groupNum);
             } catch (IOException e) {
@@ -228,15 +227,15 @@ public class QRGen extends HttpServlet {
                 
             Logger lgr = Logger.getLogger("makeQR");
             lgr.log(Level.INFO, "Created QRCode at {0}.", filepath);
-            } catch (FileNotFoundException e) {
-                this.logError(e, "makeQR");
+        } catch (FileNotFoundException e) {
+            this.logError(e, "makeQR");
                 
-            } catch (IOException e) {
-                this.logError(e, "makeQR");
+        } catch (IOException e) {
+            this.logError(e, "makeQR");
                 
-            } finally {
-                if (fout != null) { fout.close(); }
-            }
+        } finally {
+            if (fout != null) { fout.close(); }
+        }
     }
     
     /**
