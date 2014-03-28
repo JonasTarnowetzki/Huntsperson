@@ -227,6 +227,8 @@ public class QRGen extends HttpServlet {
                 
             Logger lgr = Logger.getLogger("makeQR");
             lgr.log(Level.INFO, "Created QRCode at {0}.", filepath);
+            
+            
         } catch (FileNotFoundException e) {
             this.logError(e, "makeQR");
                 
