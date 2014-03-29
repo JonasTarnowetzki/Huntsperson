@@ -10,6 +10,7 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <title>Huntsperson - Main</title>
+        <link rel="style" type="text/css" href="main_style.css">
         <script type='text/javascript'>
         function addFields(){
             // Number of inputs to create
@@ -30,12 +31,13 @@
                 container.removeChild(container.lastChild);
             }
             for (i=0;i<number;i++){
-                // Append a node with a random text
+                // Append a node with the clue number
                 container.appendChild(document.createTextNode("Clue " + (i+1)));
                 // Create an <input> element, set its type and name attributes
                 var input = document.createElement("input");
                 input.type = "text";
                 input.name = "clue" + i;
+                input.size = "64";
                 container.appendChild(input);
                 // Append a line break 
                 container.appendChild(document.createElement("br"));
@@ -52,9 +54,10 @@
         <h1>This is the main page for Huntsperson</h1>
             <form name="item" method="POST" action="QRGen">
                 <input type="hidden" id="numClues" name="numClues" value="">
+                <input type="text" id="groupName" name="groupName" value="">Group Name<br />
                 <input type="text" id="clues" name="clues" value="">Number of Clues<br />
                 <div id="container"/>
             </form>
-        <a href="#" id="filldetails" onclick="addFields()">Fill Details</a>
+        <a href="#" id="filldetails" onclick="addFields()">Generate Clue Form</a>
     </body>
 </html>
