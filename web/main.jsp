@@ -62,9 +62,17 @@
          */
         function postGroup(){
             
-            var name = document.getElementById("groupName");
-            var groupDesc = document.getElementById("groupDesc");
+            var name = document.getElementById("groupName").value;
+            var groupDesc = document.getElementById("groupDesc").value;
+            
+            //Checks whether fields are empty or not.
+            if (name==="" || groupDesc==="") {
+                window.alert("Both the group name field and the group description fields must be filled.");
+                return;
+            }
+
             /* make the API call */
+            /*
             FB.api(
                 "/" + appid + "/groups",
                 "POST",
@@ -75,29 +83,36 @@
                     }
                 },
                 function (response) {
-                if (response && !response.error) {
-                    /* handle the result */
+                    if (response && !response.error) {
+                        // handle the result
+                    }
+                    else {
+                        window.alert("Facebook creation failed with error: " + response.error);
+                    }
                 }
-            }
-                    
-            
-        );
-    }
+            ); */
+        
+            document.getElementById("p1").style.visibility="hidden";
+            document.getElementById("p2").style.display="none";
+            document.getElementById("p3").style.visibility="visible";
+            document.getElementById("p4").style.visibility="visible";
+        }
     </script>
     </head>
     <body>
         <h1>This is the main page for Huntsperson</h1>
             <form name="item" method="POST" action="QRGen">
-                <p1>
+                <p1 id="p1">
                     <input type="text" id="groupName" name="groupName" value="">Group Name<br />
                     <input type="text" id="groupDesc" name="groupDesc" value="">Group Description<br />
                 </p1>
-                <p2 class="hidden">
+                <p2 id="p3" class="hidden">
                     <input type="text" id="clues" name="clues" value="">Number of Clues<br /> 
                 </p2>
                 <input type="hidden" id="numClues" name="numClues" value="">
                 <div id="container"/>
             </form>
-        <p2 class="hidden"><a href="#" id="filldetails" onclick="addFields()">Generate Clue Form</a></p2>
+        <p1 id="p2"><a href="#" id="postGroup" onclick="postGroup()">Create Huntsperson Group on Facebook</a></p1>
+        <p2 id="p4" class="hidden"><a href="#" id="filldetails" onclick="addFields()">Generate Clue Form</a></p2>
     </body>
 </html>
