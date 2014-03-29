@@ -10,8 +10,15 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <title>Huntsperson - Main</title>
-        <link rel="style" type="text/css" href="main_style.css">
+        <link rel="stylesheet" type="text/css" href="main_style.css" />
         <script type='text/javascript'>
+            
+        var appid = "480920812033752"; //Grabbed this from the Facebook API app page
+        /**
+         * Generates the number of text fields specified by Number of Clues field
+         * and assigns them ids for future use.
+         * @returns {undefined}
+         */
         function addFields(){
             // Number of inputs to create
             var number = document.getElementById("clues").value;
@@ -48,16 +55,49 @@
             submit.value = "submit";
             container.appendChild(submit);
         }
+        
+        /**
+         * Creates a 
+         * @returns {undefined}
+         */
+        function postGroup(){
+            
+            var name = document.getElementById("groupName");
+            var groupDesc = document.getElementById("groupDesc");
+            /* make the API call */
+            FB.api(
+                "/" + appid + "/groups",
+                "POST",
+                {
+                    "object": {
+                        "name"          : name,
+                        "description"   : groupDesc
+                    }
+                },
+                function (response) {
+                if (response && !response.error) {
+                    /* handle the result */
+                }
+            }
+                    
+            
+        );
+    }
     </script>
     </head>
     <body>
         <h1>This is the main page for Huntsperson</h1>
             <form name="item" method="POST" action="QRGen">
+                <p1>
+                    <input type="text" id="groupName" name="groupName" value="">Group Name<br />
+                    <input type="text" id="groupDesc" name="groupDesc" value="">Group Description<br />
+                </p1>
+                <p2 class="hidden">
+                    <input type="text" id="clues" name="clues" value="">Number of Clues<br /> 
+                </p2>
                 <input type="hidden" id="numClues" name="numClues" value="">
-                <input type="text" id="groupName" name="groupName" value="">Group Name<br />
-                <input type="text" id="clues" name="clues" value="">Number of Clues<br />
                 <div id="container"/>
             </form>
-        <a href="#" id="filldetails" onclick="addFields()">Generate Clue Form</a>
+        <p2 class="hidden"><a href="#" id="filldetails" onclick="addFields()">Generate Clue Form</a></p2>
     </body>
 </html>
