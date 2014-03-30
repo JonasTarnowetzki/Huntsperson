@@ -4,8 +4,6 @@
  * and open the template in the editor.
  */
 
-var appid = "480920812033752"; //Grabbed this from the Facebook API app page
-
             window.fbAsyncInit = function() {
             FB.init({
                 appId      : appid,
@@ -103,24 +101,4 @@ function addFields(){
     submit.name = "action";
     submit.value = "submit";
     container.appendChild(submit);
-}
-        
-/**
- * Creates a 
- * @returns {undefined}
- */
-function postGroup(){
-            
-    var name = document.getElementById("groupName").value;
-    var groupDesc = document.getElementById("groupDesc").value;
-            
-    //Checks whether fields are empty or not.
-    if (name==="" || groupDesc==="") {
-        window.alert("Both the group name field and the group description fields must be filled.");
-        return;
-    }
-    document.getElementById("p1").style.visibility="hidden";
-    document.getElementById("p2").style.display="none";
-    document.getElementById("p3").style.visibility="visible";
-    document.getElementById("p4").style.visibility="visible";
 }

@@ -6,15 +6,22 @@
 
 package servlets;
 
+import facebook4j.auth.AccessToken;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,12 +29,12 @@ import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.servlet.ServletException;
+import static javax.servlet.SessionTrackingMode.URL;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
-
 import net.glxn.qrgen.QRCode;
 import net.glxn.qrgen.image.ImageType;
 
@@ -39,6 +46,10 @@ import net.glxn.qrgen.image.ImageType;
 public class QRGen extends HttpServlet {
     
     private final String QR_PATH = System.getProperty("user.dir").concat("/Huntsperson/QRCodes/");
+    private final String APP_ID = "480920812033752";
+    private final String APP_SECRET = "ff24167e6a9505d11c89a4b7bea5d0a8";
+    private final String GRAPH_API = "https://graph.facebook.com";
+    private final String ACCESS_TOKEN = APP_ID + "|" + APP_SECRET;
 
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
@@ -111,7 +122,6 @@ public class QRGen extends HttpServlet {
         {
             response.sendError(400, "The action specified cannot be handled by the server.");
         }
-        processRequest(request, response);
     }
 
     /**
@@ -129,6 +139,7 @@ public class QRGen extends HttpServlet {
      */
     protected void processClues(HttpServletRequest request, HttpServletResponse response) 
     {
+        this.makeGroup(request);
         
         int groupNum; 
         int groupIncrementor = 100; //increments the group number of CLUEID by one
@@ -140,6 +151,57 @@ public class QRGen extends HttpServlet {
         int intNum = Integer.parseInt(strNum);
         
         this.genQRCode(groupNum, intNum, request);
+    }
+    
+    
+    protected String makeGroup(HttpServletRequest request) {
+        String groupid = "";
+      
+        URL                 url;
+        URLConnection       urlConn;
+        DataOutputStream    printout;
+        DataInputStream     input;
+        
+        String groupName = request.getParameter("groupName");
+        String groupDesc = request.getParameter("groupDesc");
+ 
+        try {
+            // URL of Facebook Graph API
+            url = new URL (GRAPH_API + "/" + APP_ID + "/groups");
+            // URL connection channel.
+            urlConn = url.openConnection();
+            // Let the run-time system (RTS) know that we want input.
+            urlConn.setDoInput (true);
+            // Let the RTS know that we want to do output.
+            urlConn.setDoOutput (true);
+            // No caching, we want the real thing.
+            urlConn.setUseCaches (false);
+            // Specify the content type.
+            urlConn.setRequestProperty
+            ("Content-Type", "application/x-www-form-urlencoded");
+            // Send POST output.
+        
+            printout = new DataOutputStream (urlConn.getOutputStream ());
+
+            String content = "name=" + groupName + "&description=" + groupDesc + "&access_token=" + ACCESS_TOKEN;
+            printout.writeBytes (content);
+            printout.flush ();
+            printout.close ();
+            // Get response data.
+            input = new DataInputStream (urlConn.getInputStream ());
+  
+            String str;
+            while (null != ((str = input.readLine())))
+            {
+                this.logError("makeGroup", str);
+            }
+
+            input.close();
+            } catch (IOException e) {
+                this.logError(e, "makeGroup");
+            }
+        
+        return groupid;
     }
     
     /**
@@ -309,7 +371,20 @@ public class QRGen extends HttpServlet {
     }
     
     /**
-     * Logs a generic exception
+     * Logs an info level log.
+     * 
+     * @param str The method the log was created from.
+     * @param info The info to be logged.
+     */
+    protected void logError(String str, String info)
+    {
+        Logger lgr = Logger.getLogger(str);
+        lgr.log(Level.INFO, info);
+    }
+    
+    /**
+     * Logs an exception.
+     * 
      * @param e The exception thrown by the program
      * @param str The method the exception was thrown in.
      */
