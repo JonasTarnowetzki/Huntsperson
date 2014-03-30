@@ -109,7 +109,7 @@ public class QRGen extends HttpServlet {
         }
         else
         {
-            
+            response.sendError(400, "The action specified cannot be handled by the server.");
         }
         processRequest(request, response);
     }

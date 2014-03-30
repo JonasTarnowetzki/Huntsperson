@@ -1,0 +1,5 @@
+Database has name CLUETABLE and columns NUMERIC CLUEID size 8, VARCHAR FBGROUPID size 128, and VARCHAR CLUE size 256
+
+CLUEID is an eight digit number used to index the clue.  The first six digits 
+represent the group the clue responds to.  The last two digits represent the clue 
+number.
