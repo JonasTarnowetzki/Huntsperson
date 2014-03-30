@@ -98,7 +98,12 @@ public class QRGen extends HttpServlet {
             throws ServletException, IOException {
         String strAction = request.getParameter("action");
         
-        if (strAction.equalsIgnoreCase("submit"))
+        if (strAction == null)
+        {
+            response.sendError(400, "Null request sent.");
+            response.flushBuffer();
+        }
+        else if (strAction.equalsIgnoreCase("submit"))
         {
             this.processClues(request, response);
         }
