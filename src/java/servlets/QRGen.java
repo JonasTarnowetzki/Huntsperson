@@ -6,6 +6,7 @@
 
 package servlets;
 
+import facebook4j.internal.org.json.JSONArray;
 import facebook4j.internal.org.json.JSONException;
 import facebook4j.internal.org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
@@ -22,6 +23,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.Context;
@@ -43,11 +45,13 @@ import net.glxn.qrgen.image.ImageType;
 @WebServlet(name = "QRGen", urlPatterns = {"/QRGen"})
 public class QRGen extends HttpServlet {
     
-    private final String QR_PATH = System.getProperty("user.dir").concat("/Huntsperson/QRCodes/");
+    private final String QR_PATH = System.getProperty("user.dir").concat("/Huntsperson/");
     private final String APP_ID = "480920812033752";
     private final String APP_SECRET = "ff24167e6a9505d11c89a4b7bea5d0a8";
     private final String GRAPH_API = "https://graph.facebook.com";
     private final String ACCESS_TOKEN = APP_ID + "|" + APP_SECRET;
+    private final String RAND_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private final int RAND_LEN = 32;
 
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     /**
@@ -61,7 +65,7 @@ public class QRGen extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        response.sendError(401, "GET not implemented on servlet /QRGen");
+        response.sendError(501, "GET not implemented on servlet /QRGen");
         response.flushBuffer();
     }
 
@@ -105,21 +109,29 @@ public class QRGen extends HttpServlet {
      * 
      * @param request The Http Request object originating the request
      * @param response The Http Response object directed to the requesting object
+     * @throws java.io.IOException
      */
-    protected void processClues(HttpServletRequest request, HttpServletResponse response) 
+    protected void processClues(HttpServletRequest request, HttpServletResponse response) throws IOException
     {
         String fbid = this.makeGroup(request);
-        
-        int groupNum; 
+        if (fbid.equalsIgnoreCase("")) { 
+            this.endThread(response, 500, "Facebook API call failed: failed to create new group.");
+        }
+
         int groupIncrementor = 100; //increments the group number of CLUEID by one
         
-        groupNum = this.getCurClueID(groupIncrementor);
+        int groupNum = this.getCurClueID(groupIncrementor);
+        if (groupNum == 0) {
+            this.endThread(response, 500, "Failed to acquire the next available group number.");
+        }
         
         //Grabs form data for loops made later.
         String strNum = request.getParameter("numClues");
         int intNum = Integer.parseInt(strNum);
         
-        this.genQRCode(groupNum, intNum, fbid, request);
+        if (!genQRCode(groupNum, intNum, fbid, request)) {
+            this.endThread(response, 500, "Failed to generate the QR codes needed by Huntsperson.");
+        }
     }
     // </editor-fold>
     
@@ -128,7 +140,7 @@ public class QRGen extends HttpServlet {
      * clue set with.
      * 
      * @param incrementor The value to increase the multi part ClueID by per clue.
-     * @return An integer corresponding to the current ClueID
+     * @return An integer corresponding to the current ClueID, or zero if the call failed
      */
     protected int getCurClueID(int incrementor) {
         
@@ -177,7 +189,8 @@ public class QRGen extends HttpServlet {
      * 
      * @param request The request object that contains the parameters used to produce
      * the Facebook Group
-     * @return The group id of the Facebook group.
+     * @return The group id of the Facebook group, or an empty string if the Facebook
+     * API call fails.
      */
     protected String makeGroup(HttpServletRequest request) {
         String groupid = "";
@@ -236,56 +249,62 @@ public class QRGen extends HttpServlet {
      * 
      * Invokes makeQR(String, int) and insertClueIntoTable(HttpServletRequest, String, int, int)
      * 
-     * @param groupNum 
-     * @param intNum
-     * @param fbid
-     * @param request 
+     * @param groupNum The base group number.
+     * @param intNum The number of clues to generate.
+     * @param fbid The group_id of the facebook group for this Huntsperson group.
+     * @param request The request object originating this request.
+     * @return True if the QR codes were successfully generated, 
      */
-    protected void genQRCode(int groupNum, int intNum, String fbid, HttpServletRequest request) {
+    protected boolean genQRCode(int groupNum, int intNum, String fbid, HttpServletRequest request) {
         
         groupNum = this.parseClueID(groupNum);
-        
-        //TODO: devise weblink to encode in QR.
-        //webLink must equal a get/post that will call the web server and check
-        //whether the QRcode is valid or not.
-        String webLink = "tempdata"; 
-        String filepath = "";
+       
+        String filepath = QR_PATH + String.valueOf(groupNum) + "/";
         
         //First time run logic, checks whether the QR directory exists.
-        if (!new File(QR_PATH).exists()) { 
-            new File(QR_PATH).mkdirs();
-        }
+        if (!new File(filepath).exists()) { new File(filepath).mkdirs(); }
         
         for (int i = 0; i < intNum; i++)
         {
             //Code for generating QR codes for each clue goes here.
             groupNum++;
+            String cluecode = this.genRandString(new Random(), RAND_CHARS, RAND_LEN);
+            String qrData = this.genQRData(groupNum, cluecode);
+            //Failure case
+            if (qrData.equals("")) { return false; }
             
-            try { filepath = this.makeQR(webLink, groupNum);
+            try { 
+                //The act of checking this conditional creates the QR Code.  If
+                //the code is not made then false is returned.
+                if (!this.makeQR(qrData, groupNum, filepath)) {return false;}
             } catch (IOException e) {
                 this.logError(e, "genQRCode");
-                return;
+                return false;
             } 
             
-            this.insertClueIntoTable(request, filepath, fbid, groupNum, i);
+            this.insertClueIntoTable(request, cluecode, fbid, groupNum, i);
         }
+        
+        return true;
     }
     
     /**
-     * Generates a QR code 
+     * Generates a QR code encoded with the specified data, and saved to the specified
+     * filepath with a file name derived from groupNum
      * 
-     * @param webLink The data to insert into the QR code.
-     * @param groupNum 
+     * @param qrData The data to insert into the QR code.
+     * @param groupNum A unique number associated with a QRCode in the file system.
+     * @param filepath The path in the filesystem to create the code in.
      * @return
      * @throws IOException 
      */
-    protected String makeQR(String webLink, int groupNum) throws IOException {
+    protected boolean makeQR(String qrData, int groupNum, String filepath) throws IOException {
         FileOutputStream fout = null;
-        String filepath = "";
+        
         try {
-            ByteArrayOutputStream out = QRCode.from(webLink).to(ImageType.PNG).stream();
+            ByteArrayOutputStream out = QRCode.from(qrData).to(ImageType.PNG).stream();
             
-            filepath = QR_PATH.concat(String.valueOf(groupNum).concat(".png"));
+            filepath = filepath.concat(String.valueOf(groupNum).concat(".png"));
             fout = new FileOutputStream(new File(filepath));
             fout.write(out.toByteArray());
             fout.flush();
@@ -295,16 +314,16 @@ public class QRGen extends HttpServlet {
             
         } catch (FileNotFoundException e) {
             this.logError(e, "makeQR");
-            filepath = null;
+            return false;
                 
         } catch (IOException e) {
             this.logError(e, "makeQR");
-            filepath = null;
+            return false;
             
         } finally {
             if (fout != null) { fout.close(); }
         }
-        return filepath;
+        return true;
     }
     
     /**
@@ -313,11 +332,12 @@ public class QRGen extends HttpServlet {
      * 
      * @param request The HttpServletRequest object that originated this call.  
      * Contains the CLUE string in form data in "clue" + i format.
+     * @param clueCode A unique code used to ensure QRCodes are only scanned from valid sources
      * @param fbid The facebook group id that this clue is associated with.
      * @param groupNum The CLUEID of the given clue.
      * @param i The incrementor used to get clues from the request object.
      */
-    protected void insertClueIntoTable(HttpServletRequest request, String filepath, String fbid, int groupNum, int i) {
+    protected void insertClueIntoTable(HttpServletRequest request, String clueCode, String fbid, int groupNum, int i) {
         try {
             Connection con = null;
             Statement st = null;
@@ -330,8 +350,8 @@ public class QRGen extends HttpServlet {
             st = con.createStatement();
                 
             String str = request.getParameter(("clue").concat(String.valueOf(i)));
-            String insert = "INSERT INTO CLUETABLE (CLUEID,FBGROUPID,CLUE,QRPATH) ";
-            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + str + "','" + filepath + "')";
+            String insert = "INSERT INTO CLUETABLE (CLUEID,FBGROUPID,CLUE,CLUECODE) ";
+            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + str + "','" + clueCode + "')";
                
             int rows = st.executeUpdate(insert + values);
             
@@ -371,6 +391,58 @@ public class QRGen extends HttpServlet {
     }
     
     /**
+     * Generates a random string of the specified length chosen from the specified characters
+     * @param rng A series of randomly generated numbers
+     * @param characters The characters to select the content of the random string from
+     * @param length The length of the string
+     * @return A string of randomly generated characters.  Multiple invocations of this method
+     * are not guaranteed to produce unique values.
+     */
+    protected String genRandString(Random rng, String characters, int length)
+    {
+        char[] text = new char[length];
+        for (int i = 0; i < length; i++)
+        {
+            text[i] = characters.charAt(rng.nextInt(characters.length()));
+        }
+        this.logInfo("Random string '" + text + "' was created.", "genRandString");
+        return new String(text);
+    }
+    
+    /**
+     * Generates a string representation of a JSON object that can be used as QR Data to verify
+     * that a given request to the server represents a user locating the QR code in real life.
+     * 
+     * The JSON object has fields "clueid" and "cluecode", and uses as data the string 
+     * representation of groupNum and a pseudorandomly generated number.
+     * 
+     * @param clueid
+     * @param cluecode
+     * 
+     * @return A string representation of a JSON object with the appropriate fields, or an empty
+     * string if the method fails.
+     */
+    protected String genQRData(int clueid, String cluecode) {
+        
+        JSONObject jo = new JSONObject();
+        JSONArray ja = new JSONArray();
+        JSONObject mainJo = new JSONObject();
+        String jsonStr = "";
+        try {
+            jo.put("clueid", String.valueOf(clueid));
+            jo.put("cluecode", cluecode);
+            ja.put(jo);
+            mainJo.put("data", ja);
+        } catch (JSONException e) {
+            this.logError(e, "genQRData");
+            return jsonStr;
+        }
+        jsonStr = mainJo.toString();
+        this.logInfo("JSON array with contents " + jsonStr + " was created.", "genQRData");
+        return jsonStr;
+    }
+    
+    /**
      * Logs an info level log.
      * 
      * @param info The info to be logged.
@@ -392,6 +464,19 @@ public class QRGen extends HttpServlet {
     {
         Logger lgr = Logger.getLogger(str);
         lgr.log(Level.SEVERE, e.getMessage(), e);
+    }
+    
+    /**
+     * Terminates the thread and sends the specified error code to the invoking
+     * webpage.
+     * @param response The response for the originating web page.
+     * @param returnCode The return code to send to the web page.
+     * @param msg A message to be sent to the web page.
+     * @throws java.io.IOException
+     */
+    protected void endThread(HttpServletResponse response, int returnCode, String msg) throws IOException {
+        response.sendError(returnCode, msg);
+        response.flushBuffer();
     }
     
     /**
