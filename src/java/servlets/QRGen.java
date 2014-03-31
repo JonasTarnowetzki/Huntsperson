@@ -6,7 +6,8 @@
 
 package servlets;
 
-import facebook4j.auth.AccessToken;
+import facebook4j.internal.org.json.JSONException;
+import facebook4j.internal.org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -15,10 +16,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -29,7 +28,6 @@ import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.servlet.ServletException;
-import static javax.servlet.SessionTrackingMode.URL;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -139,7 +137,7 @@ public class QRGen extends HttpServlet {
      */
     protected void processClues(HttpServletRequest request, HttpServletResponse response) 
     {
-        this.makeGroup(request);
+        String fbid = this.makeGroup(request);
         
         int groupNum; 
         int groupIncrementor = 100; //increments the group number of CLUEID by one
@@ -150,63 +148,14 @@ public class QRGen extends HttpServlet {
         String strNum = request.getParameter("numClues");
         int intNum = Integer.parseInt(strNum);
         
-        this.genQRCode(groupNum, intNum, request);
+        this.genQRCode(groupNum, intNum, fbid, request);
     }
-    
-    
-    protected String makeGroup(HttpServletRequest request) {
-        String groupid = "";
-      
-        URL                 url;
-        URLConnection       urlConn;
-        DataOutputStream    printout;
-        DataInputStream     input;
-        
-        String groupName = request.getParameter("groupName");
-        String groupDesc = request.getParameter("groupDesc");
- 
-        try {
-            // URL of Facebook Graph API
-            url = new URL (GRAPH_API + "/" + APP_ID + "/groups");
-            // URL connection channel.
-            urlConn = url.openConnection();
-            // Let the run-time system (RTS) know that we want input.
-            urlConn.setDoInput (true);
-            // Let the RTS know that we want to do output.
-            urlConn.setDoOutput (true);
-            // No caching, we want the real thing.
-            urlConn.setUseCaches (false);
-            // Specify the content type.
-            urlConn.setRequestProperty
-            ("Content-Type", "application/x-www-form-urlencoded");
-            // Send POST output.
-        
-            printout = new DataOutputStream (urlConn.getOutputStream ());
-
-            String content = "name=" + groupName + "&description=" + groupDesc + "&access_token=" + ACCESS_TOKEN;
-            printout.writeBytes (content);
-            printout.flush ();
-            printout.close ();
-            // Get response data.
-            input = new DataInputStream (urlConn.getInputStream ());
-  
-            String str;
-            while (null != ((str = input.readLine())))
-            {
-                this.logError("makeGroup", str);
-            }
-
-            input.close();
-            } catch (IOException e) {
-                this.logError(e, "makeGroup");
-            }
-        
-        return groupid;
-    }
+    // </editor-fold>
     
     /**
      * Performs an SQL call to check which CLUEID to begin generating the new 
      * clue set with.
+     * 
      * @param incrementor The value to increase the multi part ClueID by per clue.
      * @return An integer corresponding to the current ClueID
      */
@@ -247,13 +196,81 @@ public class QRGen extends HttpServlet {
         } finally {
             //I have no idea what should go here, if anything.
         }
-        // </editor-fold>
         
         return num;
     }
     
+    /**
+     * Makes a Facebook group using a POST request and returns the group id 
+     * of the new group.
+     * 
+     * @param request The request object that contains the parameters used to produce
+     * the Facebook Group
+     * @return The group id of the Facebook group.
+     */
+    protected String makeGroup(HttpServletRequest request) {
+        String groupid = "";
+      
+        URL                 url;
+        URLConnection       urlConn;
+        DataOutputStream    printout;
+        DataInputStream     input;
+        
+        String groupName = request.getParameter("groupName");
+        String groupDesc = request.getParameter("groupDesc");
+ 
+        try {
+            // URL of Facebook Graph API
+            url = new URL (GRAPH_API + "/" + APP_ID + "/groups");
+            // URL connection channel.
+            urlConn = url.openConnection();
+            // Let the run-time system (RTS) know that we want input.
+            urlConn.setDoInput (true);
+            // Let the RTS know that we want to do output.
+            urlConn.setDoOutput (true);
+            // No caching, we want the real thing.
+            urlConn.setUseCaches (false);
+            // Specify the content type.
+            urlConn.setRequestProperty
+            ("Content-Type", "application/x-www-form-urlencoded");
+            // Send POST output.
+        
+            printout = new DataOutputStream (urlConn.getOutputStream ());
+
+            String content = "name=" + groupName + "&description=" + groupDesc + "&access_token=" + ACCESS_TOKEN;
+            printout.writeBytes(content);
+            printout.flush();
+            printout.close();
+            // Get response data.
+            input = new DataInputStream (urlConn.getInputStream ());
+            
+            JSONObject response = new JSONObject(input.readLine());
+            groupid = response.getString("id");
+            this.logInfo(response.toString(), "makeGroup");
+            this.logInfo(groupid, "makeGroup");
+
+            input.close();
+            } catch (IOException e) {
+                this.logError(e, "makeGroup");
+            } catch (JSONException e) {
+                this.logError(e, "makeGroup");
+            }
+        
+        return groupid;
+    }
     
-    protected void genQRCode(int groupNum, int intNum, HttpServletRequest request) {
+    /**
+     * A helper method that sets up the architecture to generate the QR codes needed
+     * for a new Huntsperson group.
+     * 
+     * Invokes makeQR(String, int) and insertClueIntoTable(HttpServletRequest, String, int, int)
+     * 
+     * @param groupNum 
+     * @param intNum
+     * @param fbid
+     * @param request 
+     */
+    protected void genQRCode(int groupNum, int intNum, String fbid, HttpServletRequest request) {
         
         groupNum = this.parseClueID(groupNum);
         
@@ -261,7 +278,7 @@ public class QRGen extends HttpServlet {
         //webLink must equal a get/post that will call the web server and check
         //whether the QRcode is valid or not.
         String webLink = "tempdata"; 
-        String fbid = "";
+        String filepath = "";
         
         //First time run logic, checks whether the QR directory exists.
         if (!new File(QR_PATH).exists()) { 
@@ -273,21 +290,31 @@ public class QRGen extends HttpServlet {
             //Code for generating QR codes for each clue goes here.
             groupNum++;
             
-            try { this.makeQR(webLink, fbid, groupNum);
+            try { filepath = this.makeQR(webLink, groupNum);
             } catch (IOException e) {
                 this.logError(e, "genQRCode");
-            }
+                return;
+            } 
             
-            this.insertClueIntoTable(request, fbid, groupNum, i);
+            this.insertClueIntoTable(request, filepath, fbid, groupNum, i);
         }
     }
     
-    protected void makeQR(String webLink, String fbid, int groupNum) throws IOException {
+    /**
+     * Generates a QR code 
+     * 
+     * @param webLink The data to insert into the QR code.
+     * @param groupNum 
+     * @return
+     * @throws IOException 
+     */
+    protected String makeQR(String webLink, int groupNum) throws IOException {
         FileOutputStream fout = null;
+        String filepath = "";
         try {
             ByteArrayOutputStream out = QRCode.from(webLink).to(ImageType.PNG).stream();
             
-            String filepath = QR_PATH.concat(String.valueOf(groupNum).concat(".png"));
+            filepath = QR_PATH.concat(String.valueOf(groupNum).concat(".png"));
             fout = new FileOutputStream(new File(filepath));
             fout.write(out.toByteArray());
             fout.flush();
@@ -295,16 +322,18 @@ public class QRGen extends HttpServlet {
             Logger lgr = Logger.getLogger("makeQR");
             lgr.log(Level.INFO, "Created QRCode at {0}.", filepath);
             
-            
         } catch (FileNotFoundException e) {
             this.logError(e, "makeQR");
+            filepath = null;
                 
         } catch (IOException e) {
             this.logError(e, "makeQR");
-                
+            filepath = null;
+            
         } finally {
             if (fout != null) { fout.close(); }
         }
+        return filepath;
     }
     
     /**
@@ -317,7 +346,7 @@ public class QRGen extends HttpServlet {
      * @param groupNum The CLUEID of the given clue.
      * @param i The incrementor used to get clues from the request object.
      */
-    protected void insertClueIntoTable(HttpServletRequest request, String fbid, int groupNum, int i) {
+    protected void insertClueIntoTable(HttpServletRequest request, String filepath, String fbid, int groupNum, int i) {
         try {
             Connection con = null;
             Statement st = null;
@@ -330,8 +359,8 @@ public class QRGen extends HttpServlet {
             st = con.createStatement();
                 
             String str = request.getParameter(("clue").concat(String.valueOf(i)));
-            String insert = "INSERT INTO CLUETABLE (CLUEID,FBGROUPID, CLUE) ";
-            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + str + "')";
+            String insert = "INSERT INTO CLUETABLE (CLUEID,FBGROUPID,CLUE,QRPATH) ";
+            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + str + "','" + filepath + "')";
                
             int rows = st.executeUpdate(insert + values);
             
@@ -373,10 +402,10 @@ public class QRGen extends HttpServlet {
     /**
      * Logs an info level log.
      * 
-     * @param str The method the log was created from.
      * @param info The info to be logged.
+     * @param str The method the log was created from.
      */
-    protected void logError(String str, String info)
+    protected void logInfo(String info, String str)
     {
         Logger lgr = Logger.getLogger(str);
         lgr.log(Level.INFO, info);
