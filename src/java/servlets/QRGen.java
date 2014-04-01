@@ -23,6 +23,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList; 
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -112,7 +113,7 @@ public class QRGen extends HttpServlet {
      * @throws java.io.IOException
      */
     protected void processClues(HttpServletRequest request, HttpServletResponse response) throws IOException
-    {
+    {   
         String groupid = this.makeGroup(request);
         if (groupid.equalsIgnoreCase("")) { 
             this.endThread(response, 500, "Facebook API call failed: failed to create new group.");
@@ -129,8 +130,17 @@ public class QRGen extends HttpServlet {
         String strNum = request.getParameter("numClues");
         int intNum = Integer.parseInt(strNum);
         
-        if (!genQRCode(groupNum, intNum, groupid, request)) {
+        ArrayList<String> allpaths = genQRCode(groupNum, intNum, groupid, request);
+                
+        if (allpaths.isEmpty()) {
             this.endThread(response, 500, "Failed to generate the QR codes needed by Huntsperson.");
+        } else {
+            response.setContentType("text/html;charset=UTF-8");
+            PrintWriter out = response.getWriter();
+            
+            out = this.makePrintablePage(allpaths, out);
+            
+            out.close();
         }
     }
     // </editor-fold>
@@ -260,22 +270,25 @@ public class QRGen extends HttpServlet {
      * A helper method that sets up the architecture to generate the QR codes needed
      * for a new Huntsperson group.
      * 
-     * Invokes makeQR(String, int) and insertClueIntoTable(HttpServletRequest, String, int, int)
+     * Invokes parseClueID(int), genRandString (Random, String, int), genQRData(int, String,),
+     * makeQR(String, int), postToGroup(String, String), and insertClueIntoTable(HttpServletRequest, String, int, int)
      * 
      * @param groupNum The base group number.
      * @param intNum The number of clues to generate.
      * @param groupid The group_id of the facebook group for this Huntsperson group.
      * @param request The request object originating this request.
-     * @return True if the QR codes were successfully generated, 
+     * @return A non-empty ArrayList if the codes were generated successfully, an empty
+     * ArrayList on failure.
      */
-    protected boolean genQRCode(int groupNum, int intNum, String groupid, HttpServletRequest request) {
+    protected ArrayList genQRCode(int groupNum, int intNum, String groupid, HttpServletRequest request) {
         
         groupNum = this.parseClueID(groupNum);
        
-        String filepath = QR_PATH + String.valueOf(groupNum) + "/";
+        String rootpath = QR_PATH + String.valueOf(groupNum) + "/";
+        ArrayList<String> allpaths = new ArrayList(intNum);
         
         //First time run logic, checks whether the QR directory exists.
-        if (!new File(filepath).exists()) { new File(filepath).mkdirs(); }
+        if (!new File(rootpath).exists()) { new File(rootpath).mkdirs(); }
         
         for (int i = 0; i < intNum; i++)
         {
@@ -284,15 +297,19 @@ public class QRGen extends HttpServlet {
             String cluecode = this.genRandString(new Random(), RAND_CHARS, RAND_LEN);
             String qrData = this.genQRData(groupNum, cluecode);
             //Failure case
-            if (qrData.equals("")) { return false; }
+            if (qrData.equals("")) { return new ArrayList(); }
             
             try { 
+                String filepath = rootpath.concat(String.valueOf(groupNum).concat(".png"));
                 //The act of checking this conditional creates the QR Code.  If
                 //the code is not made then false is returned.
-                if (!this.makeQR(qrData, groupNum, filepath)) {return false;}
+                if (!this.makeQR(qrData, groupNum, filepath)) {return new ArrayList();}
+                
+                allpaths.add(filepath);
+                
             } catch (IOException e) {
                 this.logError(e, "makeQR");
-                return false;
+                return new ArrayList();
             } 
             String clue = request.getParameter(("clue").concat(String.valueOf(i)));
             
@@ -301,7 +318,7 @@ public class QRGen extends HttpServlet {
             this.insertClueIntoTable(request, cluecode, groupid, groupNum, clue, postid);
         }
         
-        return true;
+        return allpaths;
     }
     
     /**
@@ -320,7 +337,6 @@ public class QRGen extends HttpServlet {
         try {
             ByteArrayOutputStream out = QRCode.from(qrData).to(ImageType.PNG).stream();
             
-            filepath = filepath.concat(String.valueOf(groupNum).concat(".png"));
             fout = new FileOutputStream(new File(filepath));
             fout.write(out.toByteArray());
             fout.flush();
@@ -457,6 +473,21 @@ public class QRGen extends HttpServlet {
         jsonStr = mainJo.toString();
         this.logInfo("JSON array with contents " + jsonStr + " was created.", "genQRData");
         return jsonStr;
+    }
+    
+    protected PrintWriter makePrintablePage(ArrayList<String> list, PrintWriter out) {
+        
+        out.println("<!DOCTYPE html>");
+        out.println("<html>");
+        out.println("<head>");
+        out.println("<title>Printable Huntsperson Form</title>");
+        out.println("</head>");
+        out.println("<body>");
+              
+        out.println("</body>");
+        out.println("</html>");
+        
+        return out;
     }
     
     /**
