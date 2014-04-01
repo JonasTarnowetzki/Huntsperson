@@ -113,8 +113,8 @@ public class QRGen extends HttpServlet {
      */
     protected void processClues(HttpServletRequest request, HttpServletResponse response) throws IOException
     {
-        String fbid = this.makeGroup(request);
-        if (fbid.equalsIgnoreCase("")) { 
+        String groupid = this.makeGroup(request);
+        if (groupid.equalsIgnoreCase("")) { 
             this.endThread(response, 500, "Facebook API call failed: failed to create new group.");
         }
 
@@ -129,7 +129,7 @@ public class QRGen extends HttpServlet {
         String strNum = request.getParameter("numClues");
         int intNum = Integer.parseInt(strNum);
         
-        if (!genQRCode(groupNum, intNum, fbid, request)) {
+        if (!genQRCode(groupNum, intNum, groupid, request)) {
             this.endThread(response, 500, "Failed to generate the QR codes needed by Huntsperson.");
         }
     }
@@ -244,6 +244,19 @@ public class QRGen extends HttpServlet {
     }
     
     /**
+     * Makes a post on the specified group's wall containing the specified clue.
+     * 
+     * @param groupid The id of the group to post to.
+     * @param clue The clue to be posted.
+     * @return The post ID of the post containing the clue, or an empty string on failure.
+     */
+    protected String postToGroup(String groupid, String clue) {
+        String postid = "";
+        
+        return postid;
+    }
+    
+    /**
      * A helper method that sets up the architecture to generate the QR codes needed
      * for a new Huntsperson group.
      * 
@@ -251,11 +264,11 @@ public class QRGen extends HttpServlet {
      * 
      * @param groupNum The base group number.
      * @param intNum The number of clues to generate.
-     * @param fbid The group_id of the facebook group for this Huntsperson group.
+     * @param groupid The group_id of the facebook group for this Huntsperson group.
      * @param request The request object originating this request.
      * @return True if the QR codes were successfully generated, 
      */
-    protected boolean genQRCode(int groupNum, int intNum, String fbid, HttpServletRequest request) {
+    protected boolean genQRCode(int groupNum, int intNum, String groupid, HttpServletRequest request) {
         
         groupNum = this.parseClueID(groupNum);
        
@@ -278,11 +291,14 @@ public class QRGen extends HttpServlet {
                 //the code is not made then false is returned.
                 if (!this.makeQR(qrData, groupNum, filepath)) {return false;}
             } catch (IOException e) {
-                this.logError(e, "genQRCode");
+                this.logError(e, "makeQR");
                 return false;
             } 
+            String clue = request.getParameter(("clue").concat(String.valueOf(i)));
             
-            this.insertClueIntoTable(request, cluecode, fbid, groupNum, i);
+            String postid = this.postToGroup(groupid, clue);
+            
+            this.insertClueIntoTable(request, cluecode, groupid, groupNum, clue, postid);
         }
         
         return true;
@@ -335,9 +351,11 @@ public class QRGen extends HttpServlet {
      * @param clueCode A unique code used to ensure QRCodes are only scanned from valid sources
      * @param fbid The facebook group id that this clue is associated with.
      * @param groupNum The CLUEID of the given clue.
-     * @param i The incrementor used to get clues from the request object.
+     * @param clue
+     * @param postid The id of the post this clue is contained in on the group wall.
      */
-    protected void insertClueIntoTable(HttpServletRequest request, String clueCode, String fbid, int groupNum, int i) {
+    protected void insertClueIntoTable(
+            HttpServletRequest request, String clueCode, String fbid, int groupNum, String clue, String postid) {
         try {
             Connection con = null;
             Statement st = null;
@@ -349,9 +367,8 @@ public class QRGen extends HttpServlet {
             con = ds.getConnection();
             st = con.createStatement();
                 
-            String str = request.getParameter(("clue").concat(String.valueOf(i)));
-            String insert = "INSERT INTO CLUETABLE (CLUEID,FBGROUPID,CLUE,CLUECODE) ";
-            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + str + "','" + clueCode + "')";
+            String insert = "INSERT INTO CLUETABLE (CLUEID,FBGROUPID,CLUE,CLUECODE,CLUEPOSTID) ";
+            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + clue + "','" + clueCode + "','" + postid + "')";
                
             int rows = st.executeUpdate(insert + values);
             
