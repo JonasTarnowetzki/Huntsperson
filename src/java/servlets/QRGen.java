@@ -140,7 +140,6 @@ public class QRGen extends HttpServlet {
             
             out = this.makePrintablePage(allpaths, out);
             
-            //Success, return the printable page of QR Codes.
             out.close();
         }
     }
@@ -484,15 +483,7 @@ public class QRGen extends HttpServlet {
         out.println("<title>Printable Huntsperson Form</title>");
         out.println("</head>");
         out.println("<body>");
-            out.println("<table>");
-            for (int i = 0; i < list.size(); i++) {
-                out.println("<tr>");
-                    out.println("<td>");
-                        out.println("<img src=\"" + list.get(i) + "\" "+ "alt=\"Clue " + String.valueOf(i) + "\">");
-                    out.println("</td>");
-            }
-            out.println("</tr>");
-            out.println("</table>");
+              
         out.println("</body>");
         out.println("</html>");
         
