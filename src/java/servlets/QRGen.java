@@ -46,7 +46,7 @@ import net.glxn.qrgen.image.ImageType;
 @WebServlet(name = "QRGen", urlPatterns = {"/QRGen"})
 public class QRGen extends HttpServlet {
     
-    private final String QR_PATH = System.getProperty("user.dir").concat("/Huntsperson/");
+    //private final String QR_PATH = System.getProperty("user.dir").concat("/Huntsperson/");
     private final String APP_ID = "480920812033752";
     private final String APP_SECRET = "ff24167e6a9505d11c89a4b7bea5d0a8";
     private final String GRAPH_API = "https://graph.facebook.com";
@@ -130,15 +130,15 @@ public class QRGen extends HttpServlet {
         String strNum = request.getParameter("numClues");
         int intNum = Integer.parseInt(strNum);
         
-        ArrayList<String> allpaths = genQRCode(groupNum, intNum, groupid, request);
+        ArrayList<ArrayList<String>> printData = genQRCode(groupNum, intNum, groupid, request);
                 
-        if (allpaths.isEmpty()) {
+        if (printData.isEmpty()) {
             this.endThread(response, 500, "Failed to generate the QR codes needed by Huntsperson.");
         } else {
             response.setContentType("text/html;charset=UTF-8");
             PrintWriter out = response.getWriter();
             
-            out = this.makePrintablePage(allpaths, out);
+            out = this.makePrintablePage(printData, out);
             
             out.close();
         }
@@ -284,11 +284,21 @@ public class QRGen extends HttpServlet {
         
         groupNum = this.parseClueID(groupNum);
        
-        String rootpath = QR_PATH + String.valueOf(groupNum) + "/";
-        ArrayList<String> allpaths = new ArrayList(intNum);
+        /* The localPath is the path on disk leading to the servlet context path.
+         * The rootpath is the relative path to the resource on the servlet.
+         * The absolute path is the combination of these two paths.
+         *
+         * The local path is used to generate a File object to save QR Codes to.  It
+         * does this in conjunction with the rootpath.
+         * The rootpath is used to generate a URL that can be displayed in an HTML form
+         */
+        String localPath = this.getServletConfig().getServletContext().getRealPath("/");
+        String rootpath = "QRGen/" + String.valueOf(groupNum) + "/";
+        String absolutePath = localPath + rootpath;
+        ArrayList<ArrayList<String>> printData = new ArrayList<ArrayList<String>>(intNum);
         
         //First time run logic, checks whether the QR directory exists.
-        if (!new File(rootpath).exists()) { new File(rootpath).mkdirs(); }
+        if (!new File(absolutePath).exists()) { new File(absolutePath).mkdirs(); }
         
         for (int i = 0; i < intNum; i++)
         {
@@ -300,12 +310,10 @@ public class QRGen extends HttpServlet {
             if (qrData.equals("")) { return new ArrayList(); }
             
             try { 
-                String filepath = rootpath.concat(String.valueOf(groupNum).concat(".png"));
+                String filepath = absolutePath.concat(String.valueOf(groupNum).concat(".png"));
                 //The act of checking this conditional creates the QR Code.  If
                 //the code is not made then false is returned.
                 if (!this.makeQR(qrData, groupNum, filepath)) {return new ArrayList();}
-                
-                allpaths.add(filepath);
                 
             } catch (IOException e) {
                 this.logError(e, "makeQR");
@@ -315,10 +323,15 @@ public class QRGen extends HttpServlet {
             
             String postid = this.postToGroup(groupid, clue);
             
+            ArrayList<String> data = new ArrayList(2);
+            data.add(0, rootpath.concat(String.valueOf(groupNum).concat(".png")));
+            data.add(1, clue);
+            printData.add(data);
+            
             this.insertClueIntoTable(request, cluecode, groupid, groupNum, clue, postid);
         }
         
-        return allpaths;
+        return printData;
     }
     
     /**
@@ -475,7 +488,7 @@ public class QRGen extends HttpServlet {
         return jsonStr;
     }
     
-    protected PrintWriter makePrintablePage(ArrayList<String> list, PrintWriter out) {
+    protected PrintWriter makePrintablePage(ArrayList<ArrayList<String>> data, PrintWriter out) {
         
         out.println("<!DOCTYPE html>");
         out.println("<html>");
@@ -484,10 +497,13 @@ public class QRGen extends HttpServlet {
         out.println("</head>");
         out.println("<body>");
             out.println("<table>");
-            for (int i = 0; i < list.size(); i++) {
+            for (int i = 0; i < data.size(); i++) {
                 out.println("<tr>");
                     out.println("<td>");
-                        out.println("<img src=\"" + list.get(i) + "\" "+ "alt=\"Clue " + String.valueOf(i) + "\">");
+                        out.println("<img src=\"" + data.get(i).get(0) + "\" "+ "alt=\"Clue " + String.valueOf(i) + "\">");
+                    out.println("</td>");
+                    out.println("<td>");
+                        out.println("Clue " + i + ": " + data.get(i).get(1));
                     out.println("</td>");
             }
             out.println("</tr>");
@@ -545,4 +561,5 @@ public class QRGen extends HttpServlet {
         return "Short description";
     }
 // </editor-fold>
+
 }
