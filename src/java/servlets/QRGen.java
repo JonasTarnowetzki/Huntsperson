@@ -217,6 +217,7 @@ public class QRGen extends HttpServlet {
         
         String groupName = request.getParameter("groupName");
         String groupDesc = request.getParameter("groupDesc");
+        String groupAdmin = request.getParameter("userID");
  
         try {
             // URL of Facebook Graph API
@@ -238,8 +239,14 @@ public class QRGen extends HttpServlet {
 
             String content = "name=" + URLEncoder.encode(groupName, "UTF-8") 
                     + "&description=" + URLEncoder.encode(groupDesc, "UTF-8") 
-                    + "&privacy=open" //Temporary fix, to be resolved later.
+                    + "&admin=" + URLEncoder.encode(groupAdmin, "UTF-8") 
                     + "&access_token=" + ACCESS_TOKEN;
+            
+            this.logInfo("Facebook publish group request sent with parameters "
+                    + "Name=" + URLEncoder.encode(groupName, "UTF-8")
+                    + ", Description=" + URLEncoder.encode(groupDesc, "UTF-8")
+                    + ", Admin=" + URLEncoder.encode(groupAdmin, "UTF-8") , "makeGroup");
+            
             printout.writeBytes(content);
             printout.flush();
             printout.close();

@@ -87,6 +87,7 @@
             });
                 FB.api('/me', function(response) {
                     console.log('Good to see you, ' + response.name + '.');
+                    console.log('User ID: ' + response.id + '.');
                     document.getElementById("userID").value = response.id;
                 });
         }
@@ -107,7 +108,7 @@
                 </p2>
                 <input type="hidden" id="numClues" name="numClues" value="">
                 <input type="hidden" id="userToken" name="userToken" value="">
-                <input type="hidden" is="userID" name="userID" value="">
+                <input type="hidden" id="userID" name="userID" value="">
                 <div id="container"/>
             </form>
             <p2 id="p4" class="hidden"><a href="#" id="filldetails" onclick="addFields()">Generate Clue Form</a></p2>
