@@ -71,7 +71,7 @@ public class QRGen extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        response.sendError(501, "GET not implemented on servlet /QRGen");
+        response.sendRedirect("index.jsp");
         response.flushBuffer();
     }
 
