@@ -266,6 +266,8 @@ public class QRGen extends HttpServlet {
      * 
      * @param groupid The id of the group to post to.
      * @param clue The clue to be posted.
+     * @param num The clue number we are posting.
+     * @param userToken An access token with permissions to post on the group.
      * @return The post ID of the post containing the clue, or an empty string on failure.
      */
     protected String postToGroup(String groupid, String clue, int num, String userToken) {
