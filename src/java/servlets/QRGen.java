@@ -51,6 +51,8 @@ public class QRGen extends HttpServlet {
     private final String APP_SECRET = "ff24167e6a9505d11c89a4b7bea5d0a8";
     private final String GRAPH_API = "https://graph.facebook.com";
     private final String ACCESS_TOKEN = APP_ID + "|" + APP_SECRET;
+    //This user token has user_group and group publish permissions for Huntsperson
+    private final String USER_TOKEN = "CAAG1ZARoqltgBAPKsDY0FNEdttk2msTXtYPLNObM6tILKcY6gZCH3rBhFPH1xE7yEenY90A1I8iHQwbb6VKyKo4t8acxxIyQZBfI88ZB4tr8ZBfq7t5ZAvrEGcrkRkzV0kC8y1XDdMuKARAGBNg0LJ4XudHdzqZC52VL0G6POVutLRxda9t13ifQVjqFSsZA6wEZD";
     private final String RAND_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private final int RAND_LEN = 32;
     private final int PNG_URL_INDEX = 0;
@@ -262,8 +264,51 @@ public class QRGen extends HttpServlet {
      * @param clue The clue to be posted.
      * @return The post ID of the post containing the clue, or an empty string on failure.
      */
-    protected String postToGroup(String groupid, String clue) {
+    protected String postToGroup(String groupid, String clue, int num) {
         String postid = "";
+        
+        URL                 url;
+        URLConnection       urlConn;
+        DataOutputStream    printout;
+        DataInputStream     input;
+ 
+        try {
+            // URL of Facebook Graph API
+            url = new URL (GRAPH_API + "/" + groupid + "/feed");
+            // URL connection channel.
+            urlConn = url.openConnection();
+            // Let the run-time system (RTS) know that we want input.
+            urlConn.setDoInput (true);
+            // Let the RTS know that we want to do output.
+            urlConn.setDoOutput (true);
+            // No caching, we want the real thing.
+            urlConn.setUseCaches (false);
+            // Specify the content type.
+            urlConn.setRequestProperty
+            ("Content-Type", "application/x-www-form-urlencoded");
+            // Send POST output.
+        
+            printout = new DataOutputStream (urlConn.getOutputStream ());
+
+            String content = "message=Clue " + String.valueOf(num + 1) + ": " + clue 
+                    + "&access_token=" + USER_TOKEN;
+            printout.writeBytes(content);
+            printout.flush();
+            printout.close();
+            // Get response data.
+            input = new DataInputStream (urlConn.getInputStream ());
+            
+            JSONObject response = new JSONObject(input.readLine());
+            postid = response.getString("id");
+            this.logInfo(response.toString(), "postToGroup");
+            this.logInfo(postid, "postToGroup");
+
+            input.close();
+            } catch (IOException e) {
+                this.logError(e, "postToGroup");
+            } catch (JSONException e) {
+                this.logError(e, "postToGroup");
+            }
         
         return postid;
     }
@@ -323,7 +368,7 @@ public class QRGen extends HttpServlet {
             } 
             String clue = request.getParameter(("clue").concat(String.valueOf(i)));
             
-            String postid = this.postToGroup(groupid, clue);
+            String postid = this.postToGroup(groupid, clue, i);
             
             ArrayList<String> data = new ArrayList(2);
             data.add(PNG_URL_INDEX, rootpath.concat(String.valueOf(groupNum).concat(".png")));
@@ -382,7 +427,7 @@ public class QRGen extends HttpServlet {
      * @param clueCode A unique code used to ensure QRCodes are only scanned from valid sources
      * @param fbid The facebook group id that this clue is associated with.
      * @param groupNum The CLUEID of the given clue.
-     * @param clue
+     * @param clue The description of the given clue.
      * @param postid The id of the post this clue is contained in on the group wall.
      */
     protected void insertClueIntoTable(
@@ -399,7 +444,8 @@ public class QRGen extends HttpServlet {
             st = con.createStatement();
                 
             String insert = "INSERT INTO CLUETABLE (CLUEID,FBGROUPID,CLUE,CLUECODE,CLUEPOSTID) ";
-            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + clue + "','" + clueCode + "','" + postid + "')";
+            String values = "VALUES (" + groupNum + ",'" + fbid + "','" + clue + "','" + clueCode 
+                    + "','" + postid + "')";
                
             int rows = st.executeUpdate(insert + values);
             
@@ -518,7 +564,7 @@ public class QRGen extends HttpServlet {
                                 + "\" "+ "alt=\"Clue " + String.valueOf(i) + "\">");
                     out.println("</td>");
                     out.println("<td>");
-                        out.println("Clue " + i + ": " + data.get(i).get(CLUE_INDEX));
+                        out.println("Clue " + (i+1) + ": " + data.get(i).get(CLUE_INDEX));
                     out.println("</td>");
             }
             out.println("</tr>");
