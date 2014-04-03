@@ -87,14 +87,21 @@ public class QRGen extends HttpServlet {
             throws ServletException, IOException {
         String strAction = request.getParameter("action");
         
-        if (strAction == null)
-        {
+        if (strAction == null) {
             response.sendError(400, "Null request sent.");
             response.flushBuffer();
         }
-        else if (strAction.equalsIgnoreCase("submit"))
-        {
+        else if (strAction.equalsIgnoreCase("submit")) {
             this.processClues(request, response);
+        }
+        else if (strAction.equalsIgnoreCase("verify")) {
+            //String clueid = request.getParameter("clueid");
+            //String cluecode = request.getParameter("cluecode");
+            //String userid = request.getParameter("userid");
+            //String accessToken = request.getParameter("accessToken");
+            //String cluepostid = this.verifyQR(clueid, cluecode);
+            //this.postSuccess(cluepostid, userid, accessToken);
+            response.sendError(501, "Post action \"verify\" not implemented at this time.");
         }
         else
         {
