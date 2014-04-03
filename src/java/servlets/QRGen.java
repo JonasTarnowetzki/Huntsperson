@@ -6,6 +6,7 @@
 
 package servlets;
 
+import facebook4j.Facebook;
 import facebook4j.internal.org.json.JSONArray;
 import facebook4j.internal.org.json.JSONException;
 import facebook4j.internal.org.json.JSONObject;
@@ -17,8 +18,10 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -51,8 +54,6 @@ public class QRGen extends HttpServlet {
     private final String APP_SECRET = "ff24167e6a9505d11c89a4b7bea5d0a8";
     private final String GRAPH_API = "https://graph.facebook.com";
     private final String ACCESS_TOKEN = APP_ID + "|" + APP_SECRET;
-    //This user token has user_group and group publish permissions for Huntsperson
-    private final String USER_TOKEN = "CAAG1ZARoqltgBAPKsDY0FNEdttk2msTXtYPLNObM6tILKcY6gZCH3rBhFPH1xE7yEenY90A1I8iHQwbb6VKyKo4t8acxxIyQZBfI88ZB4tr8ZBfq7t5ZAvrEGcrkRkzV0kC8y1XDdMuKARAGBNg0LJ4XudHdzqZC52VL0G6POVutLRxda9t13ifQVjqFSsZA6wEZD";
     private final String RAND_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private final int RAND_LEN = 32;
     private final int PNG_URL_INDEX = 0;
@@ -235,7 +236,10 @@ public class QRGen extends HttpServlet {
         
             printout = new DataOutputStream (urlConn.getOutputStream ());
 
-            String content = "name=" + groupName + "&description=" + groupDesc + "&access_token=" + ACCESS_TOKEN;
+            String content = "name=" + URLEncoder.encode(groupName, "UTF-8") 
+                    + "&description=" + URLEncoder.encode(groupDesc, "UTF-8") 
+                    + "&privacy=open" //Temporary fix, to be resolved later.
+                    + "&access_token=" + ACCESS_TOKEN;
             printout.writeBytes(content);
             printout.flush();
             printout.close();
@@ -264,19 +268,19 @@ public class QRGen extends HttpServlet {
      * @param clue The clue to be posted.
      * @return The post ID of the post containing the clue, or an empty string on failure.
      */
-    protected String postToGroup(String groupid, String clue, int num) {
+    protected String postToGroup(String groupid, String clue, int num, String userToken) {
         String postid = "";
         
         URL                 url;
-        URLConnection       urlConn;
+        HttpURLConnection   urlConn;
         DataOutputStream    printout;
         DataInputStream     input;
- 
+        
         try {
             // URL of Facebook Graph API
             url = new URL (GRAPH_API + "/" + groupid + "/feed");
             // URL connection channel.
-            urlConn = url.openConnection();
+            urlConn = (HttpURLConnection) url.openConnection();
             // Let the run-time system (RTS) know that we want input.
             urlConn.setDoInput (true);
             // Let the RTS know that we want to do output.
@@ -286,12 +290,13 @@ public class QRGen extends HttpServlet {
             // Specify the content type.
             urlConn.setRequestProperty
             ("Content-Type", "application/x-www-form-urlencoded");
+            urlConn.setRequestMethod("POST");
             // Send POST output.
         
             printout = new DataOutputStream (urlConn.getOutputStream ());
 
-            String content = "message=Clue " + String.valueOf(num + 1) + ": " + clue 
-                    + "&access_token=" + USER_TOKEN;
+            String content = "message=Clue+" + String.valueOf(num + 1) + ":+" + URLEncoder.encode(clue, "UTF-8")
+                    + "&access_token=" + userToken;
             printout.writeBytes(content);
             printout.flush();
             printout.close();
@@ -368,7 +373,9 @@ public class QRGen extends HttpServlet {
             } 
             String clue = request.getParameter(("clue").concat(String.valueOf(i)));
             
-            String postid = this.postToGroup(groupid, clue, i);
+            String userToken = request.getParameter("userToken");
+            String postid = this.postToGroup(groupid, clue, i, userToken);
+            if (postid.equals("")) { return new ArrayList(); }
             
             ArrayList<String> data = new ArrayList(2);
             data.add(PNG_URL_INDEX, rootpath.concat(String.valueOf(groupNum).concat(".png")));
