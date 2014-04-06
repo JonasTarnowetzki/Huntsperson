@@ -96,12 +96,13 @@ public class QRGen extends HttpServlet {
             this.processClues(request, response);
         }
         else if (strAction.equalsIgnoreCase("verify")) {
-            //String clueid = request.getParameter("clueid");
-            //String cluecode = request.getParameter("cluecode");
-            //String userid = request.getParameter("userid");
-            //String accessToken = request.getParameter("accessToken");
-            //String cluepostid = this.verifyQR(clueid, cluecode);
-            //this.postSuccess(cluepostid, userid, accessToken);
+            String clueid = request.getParameter("clueid");
+            String cluecode = request.getParameter("cluecode");
+            String userid = request.getParameter("userid");
+            String accessToken = request.getParameter("accessToken");
+            String cluepostid = this.verifyQR(clueid, cluecode);
+            this.postSuccess(cluepostid, userid, accessToken);
+            
             response.sendError(501, "Post action \"verify\" not implemented at this time.");
         }
         else
@@ -649,5 +650,13 @@ public class QRGen extends HttpServlet {
         return "Short description";
     }
 // </editor-fold>
+
+    private void postSuccess(String cluepostid, String userid, String accessToken) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    private String verifyQR(String clueid, String cluecode) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 
 }
