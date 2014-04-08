@@ -6,7 +6,6 @@
 
 package servlets;
 
-import facebook4j.Facebook;
 import facebook4j.internal.org.json.JSONArray;
 import facebook4j.internal.org.json.JSONException;
 import facebook4j.internal.org.json.JSONObject;
@@ -94,6 +93,7 @@ public class QRGen extends HttpServlet {
         }
         else if (strAction.equalsIgnoreCase("submit")) {
             this.processClues(request, response);
+            response.setStatus(200);
         }
         else if (strAction.equalsIgnoreCase("verify")) {
             String clueid = request.getParameter("clueid");
@@ -108,6 +108,7 @@ public class QRGen extends HttpServlet {
         else
         {
             response.sendError(400, "The action specified cannot be handled by the server.");
+            this.logInfo("doPost", "Received unknown post from " + request.getRemoteHost());
         }
     }
 
