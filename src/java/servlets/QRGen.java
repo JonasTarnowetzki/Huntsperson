@@ -101,14 +101,19 @@ public class QRGen extends HttpServlet {
             String userid = request.getParameter("userid");
             String accessToken = request.getParameter("accessToken");
             String cluepostid = this.verifyQR(clueid, cluecode);
-            this.postSuccess(cluepostid, userid, accessToken);
-            
-            response.sendError(501, "Post action \"verify\" not implemented at this time.");
+            if (cluepostid.equals("")) {
+                response.sendError(420, "The provided QR code failed to match any Huntsperson entry.");
+                return;
+            }
+            if (postSuccess(cluepostid, userid, accessToken).equals("")) {
+                response.sendError(420, "Failed to post the success to Facebook.");
+                return;
+            }
+            response.setStatus(200);
         }
         else
         {
             response.sendError(400, "The action specified cannot be handled by the server.");
-            this.logInfo("doPost", "Received unknown post from " + request.getRemoteHost());
         }
     }
 
@@ -605,6 +610,115 @@ public class QRGen extends HttpServlet {
     }
     
     /**
+     * Posts a success message to the clue comment on behalf of the user.
+     * @param cluepostid
+     * @param userid
+     * @param accessToken 
+     */
+    private String postSuccess(String cluepostid, String userid, String accessToken) {
+        
+        URL                 url;
+        URLConnection       urlConn;
+        DataOutputStream    printout;
+        DataInputStream     input;
+        
+        String replyid = "";
+ 
+        try {
+            // URL of Facebook Graph API
+            url = new URL (GRAPH_API + "/" + cluepostid + "/comments");
+            // URL connection channel.
+            urlConn = url.openConnection();
+            // Let the run-time system (RTS) know that we want input.
+            urlConn.setDoInput (true);
+            // Let the RTS know that we want to do output.
+            urlConn.setDoOutput (true);
+            // No caching, we want the real thing.
+            urlConn.setUseCaches (false);
+            // Specify the content type.
+            urlConn.setRequestProperty
+            ("Content-Type", "application/x-www-form-urlencoded");
+            // Send POST output.
+        
+            printout = new DataOutputStream (urlConn.getOutputStream ());
+
+            String content = "message=" + URLEncoder.encode("I found this clue!", "UTF-8") 
+                    + "&access_token=" + URLEncoder.encode(accessToken, "UTF-8");
+            
+            this.logInfo("POSTed to " + url.toString() + "with message I found this clue!", "postSuccess");
+            
+            printout.writeBytes(content);
+            printout.flush();
+            printout.close();
+            // Get response data.
+            input = new DataInputStream (urlConn.getInputStream ());
+            
+            JSONObject response = new JSONObject(input.readLine());
+            replyid = response.getString("id");
+            this.logInfo(response.toString(), "postSuccess");
+            this.logInfo(replyid, "postSuccess");
+
+            input.close();
+            } catch (IOException e) {
+                this.logError(e, "postSuccess");
+            } catch (JSONException e) {
+                this.logError(e, "postSuccess");
+            }
+        
+        return replyid;
+    }
+
+    /**
+     * Verifies that the clue id/code pair is a valid entry in the database.
+     * 
+     * @param clueid A unique clue id in numeric string format
+     * @param cluecode A randomly generated string that is paired with the clue id
+     * @return The postid of the clue that is to be solved, or a blank string if 
+     * either of the parameters is incorrect.
+     */
+    private String verifyQR(String clueid, String cluecode) {
+        
+        String cluepostid = "";
+        
+        try {
+            Connection con = null;
+            Statement st = null;
+            ResultSet rs = null;
+                
+            Context ctx = new InitialContext();
+            DataSource ds = (DataSource) ctx.lookup("java:comp/env/jdbc/Huntsperson");
+                
+            con = ds.getConnection();
+            st = con.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                
+            String insert = "SELECT CLUEPOSTID FROM CLUETABLE ";
+            String values = "WHERE (CLUEID=" + Integer.valueOf(clueid) + " AND CLUECODE='" + cluecode + "')";
+               
+            rs = st.executeQuery(insert + values);
+            //rs is expected to have only one entry, so 
+            if (!rs.first()) { 
+                this.logInfo(insert, values);
+            }
+            else {
+                cluepostid = rs.getString(1);
+                this.logInfo(insert, values);
+            }
+            
+            Logger lgr = Logger.getLogger("verifyQR");
+            lgr.log(Level.INFO, "Executed SQL statement {0}{1}", new Object[]{insert, values});
+            
+        } catch (SQLException e){
+            this.logError(e, "verifyQR");
+        } catch (NamingException e){
+            this.logError(e, "verifyQR");
+        } finally {
+        //I have no idea what should go here, if anything.
+        }
+        
+        return cluepostid;
+    }
+    
+    /**
      * Logs an info level log.
      * 
      * @param info The info to be logged.
@@ -651,13 +765,4 @@ public class QRGen extends HttpServlet {
         return "Short description";
     }
 // </editor-fold>
-
-    private void postSuccess(String cluepostid, String userid, String accessToken) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    private String verifyQR(String clueid, String cluecode) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
 }
